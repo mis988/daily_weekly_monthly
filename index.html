@@ -202,6 +202,12 @@
         </div>
         <div class="field" id="daysWrap">
           <label>Days of week <span style="font-weight:400;color:var(--muted)">(for daily / weekly — leave all off = every day)</span></label>
+          <div class="day-presets" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">
+            <button type="button" class="btn-ghost preset" data-preset="all" style="padding:7px 12px;font-size:12px">All days</button>
+            <button type="button" class="btn-ghost preset" data-preset="monsat" style="padding:7px 12px;font-size:12px">Mon–Sat</button>
+            <button type="button" class="btn-ghost preset" data-preset="monfri" style="padding:7px 12px;font-size:12px">Mon–Fri</button>
+            <button type="button" class="btn-ghost preset" data-preset="clear" style="padding:7px 12px;font-size:12px">Clear</button>
+          </div>
           <div class="days" id="tDays"></div>
         </div>
         <div class="field"><label>Link (optional)</label><input id="tLink" placeholder="https://…"></div>
@@ -258,7 +264,7 @@
 <script>
 /* ================= CONFIG ================= */
 /* Apps Script Web App URL yaha paste karo (setup guide me steps hain): */
-const API_URL = "https://script.google.com/macros/s/AKfycbyL5vD-wmITNLTphSZsGVTG9vWib_M5reVUuvyVJIFiYrURttZCOlgvbrf-ECufpf5z/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbyHVtGTpdfxlgrkrlAjEgOQWY0-ZvazZzM9rzlDHexQKb-EV0m-JpgxrYEB-Pi9jTNR/exec";
 
 /* ================= state ================= */
 const S = { name:null, role:null, phone:null, pin:null, tasks:[], completions:[], users:[] };
@@ -450,6 +456,16 @@ function buildDayChips(){
     wrap.appendChild(l);
   });
 }
+function setDaysPreset(preset){
+  const map = {
+    all:    ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+    monsat: ["Mon","Tue","Wed","Thu","Fri","Sat"],
+    monfri: ["Mon","Tue","Wed","Thu","Fri"],
+    clear:  []
+  };
+  const want = map[preset] || [];
+  document.querySelectorAll("#tDays input").forEach(c=>{ c.checked = want.includes(c.value); });
+}
 function renderToday(){
   if(!S.name) return;
   const staff=isStaff();
@@ -472,9 +488,10 @@ function renderToday(){
   tbody.innerHTML = rows.map(r=>{
     const link = r.t.Link ? `<a href="${esc(r.t.Link)}" target="_blank" rel="noopener">Open ↗</a>` : "—";
     const status = r.done ? `<span class="pill-done">Done</span>` : `<span class="pill-pending">Pending</span>`;
-    const btn = r.done
+    const mine = r.t.Doer.trim().toLowerCase() === S.name.trim().toLowerCase();
+    const btn = !mine ? "" : (r.done
       ? `<button class="btn-undo" onclick="undo('${r.t.TaskID}','${r.date}')">Undo</button>`
-      : `<button class="btn-done" onclick="done('${r.t.TaskID}','${r.date}')">Mark done</button>`;
+      : `<button class="btn-done" onclick="done('${r.t.TaskID}','${r.date}')">Mark done</button>`);
     return `<tr>${staff?`<td>${esc(r.t.Doer)}</td>`:""}<td><strong>${esc(r.t.Title)}</strong></td><td>${link}</td><td>${status}</td><td style="text-align:right">${btn}</td></tr>`;
   }).join("");
 }
@@ -573,8 +590,8 @@ function renderDashboard(){
   }
 
   // staff: table of everyone
-  const doers = S.users.filter(u=>!isStaffRole(u.role)).map(u=>u.name);
-  const targets = doers.length? doers : doerList();
+  // sab users (admin/sub-admin bhi task le sakte hain, isliye sabhi dikhenge)
+  const targets = doerList();
   const rows = targets.map(name=>{
     const w=scoreFor(name, wf, wt), m=scoreFor(name, mf, mt);
     return {name,w,m};
@@ -654,6 +671,7 @@ $("#todayEmp").onchange=renderToday;
 $("#masterSearch").oninput=renderMaster;
 $("#masterEmp").onchange=renderMaster;
 $("#hamburger").onclick=()=>$("#sidebar").classList.toggle("open");
+document.querySelectorAll(".preset").forEach(b=> b.onclick=()=>setDaysPreset(b.dataset.preset));
 
 /* boot */
 if(API_URL.startsWith("PASTE")){
