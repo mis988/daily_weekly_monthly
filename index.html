@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task System</title>
+<style>
+  :root{
+    --navy:#0f2038; --navy-2:#16294a; --line:#e3e7ef; --bg:#f5f7fb;
+    --ink:#1c2536; --muted:#6b7688; --accent:#2f6df6; --accent-d:#1f57d6;
+    --good:#15a34a; --good-bg:#e7f6ec; --bad:#dc2b3d; --bad-bg:#fdeaec;
+    --warn:#b7791f; --card:#ffffff; --radius:12px;
+    --shadow:0 1px 2px rgba(16,32,60,.06),0 6px 20px rgba(16,32,60,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); font-size:14px; line-height:1.45}
+  h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+  button{font-family:inherit;cursor:pointer;border:none;border-radius:9px;font-size:13px;font-weight:600}
+  input,select{font-family:inherit;font-size:14px;padding:10px 11px;border:1px solid var(--line);
+    border-radius:9px;background:#fff;color:var(--ink);width:100%}
+  input:focus,select:focus{outline:2px solid rgba(47,109,246,.25);border-color:var(--accent)}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
+  a{color:var(--accent);text-decoration:none}
+  .hidden{display:none!important}
+
+  /* ---------- Login ---------- */
+  #login{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+  .login-card{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);
+    border-radius:16px;box-shadow:var(--shadow);padding:30px 28px}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
+  .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--accent),#7aa2ff);
+    display:grid;place-items:center;color:#fff;font-weight:800}
+  .brand small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+  .field{margin-bottom:14px}
+  .btn-primary{background:var(--accent);color:#fff;padding:12px 14px;width:100%;border-radius:10px}
+  .btn-primary:hover{background:var(--accent-d)}
+  .msg{margin-top:12px;font-size:13px;padding:9px 11px;border-radius:8px;display:none}
+  .msg.err{display:block;background:var(--bad-bg);color:var(--bad)}
+  .msg.ok{display:block;background:var(--good-bg);color:var(--good)}
+
+  /* ---------- App shell ---------- */
+  #app{display:grid;grid-template-columns:230px 1fr;min-height:100%}
+  aside{background:var(--navy);color:#cdd6e6;padding:18px 14px;display:flex;flex-direction:column;gap:4px}
+  aside .brand{color:#fff;margin-bottom:20px}
+  aside .brand small{color:#8aa0c4}
+  .nav-btn{display:flex;align-items:center;gap:10px;text-align:left;background:transparent;color:#cdd6e6;
+    padding:11px 12px;border-radius:9px;font-weight:600;width:100%}
+  .nav-btn:hover{background:var(--navy-2);color:#fff}
+  .nav-btn.active{background:var(--accent);color:#fff}
+  .nav-btn .ic{width:18px;text-align:center}
+  .sidefoot{margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:14px}
+  .who{font-size:13px;color:#fff;font-weight:600}
+  .who small{display:block;color:#8aa0c4;font-weight:500;text-transform:capitalize}
+  .logout{margin-top:10px;background:var(--navy-2);color:#cdd6e6;padding:9px 12px;width:100%}
+  .logout:hover{background:#1e3358;color:#fff}
+
+  main{padding:26px 30px;overflow:auto}
+  .page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;gap:12px;flex-wrap:wrap}
+  .page-head p{margin:4px 0 0;color:var(--muted)}
+  .view{display:none}
+  .view.active{display:block}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .card-pad{padding:20px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+  .toolbar .grow{flex:1}
+  .btn-ghost{background:#eef1f7;color:var(--ink);padding:10px 14px}
+  .btn-ghost:hover{background:#e3e8f2}
+
+  /* weekday chips */
+  .days{display:flex;gap:6px;flex-wrap:wrap}
+  .day-chip{position:relative}
+  .day-chip input{position:absolute;opacity:0;inset:0;cursor:pointer}
+  .day-chip span{display:block;padding:8px 12px;border:1px solid var(--line);border-radius:20px;
+    font-size:12px;font-weight:600;color:var(--muted);background:#fff;user-select:none}
+  .day-chip input:checked + span{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;background:#fafbfd}
+  tbody tr:hover{background:#fafcff}
+  .empty{padding:28px;text-align:center;color:var(--muted)}
+  .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;text-transform:capitalize}
+  .tag.freq{background:#eef2ff;color:#3550c9}
+  .tag.role-admin{background:#fdeaec;color:var(--bad)}
+  .tag.role-subadmin{background:#fff4e0;color:var(--warn)}
+  .tag.role-doer{background:#e9f0ff;color:var(--accent-d)}
+  .btn-done{background:var(--good);color:#fff;padding:7px 13px}
+  .btn-done:hover{filter:brightness(.94)}
+  .btn-undo{background:#eef1f7;color:var(--muted);padding:7px 13px}
+  .btn-del{background:var(--bad-bg);color:var(--bad);padding:7px 11px}
+  .btn-del:hover{background:#fbdadf}
+  .pill-done{background:var(--good-bg);color:var(--good);padding:5px 11px;border-radius:20px;font-weight:700;font-size:12px}
+  .pill-pending{background:#fff4e0;color:var(--warn);padding:5px 11px;border-radius:20px;font-weight:700;font-size:12px}
+
+  /* score cards */
+  .score-card{padding:18px}
+  .score-card .lbl{color:var(--muted);font-size:12px;font-weight:600}
+  .score-card .val{font-size:30px;font-weight:750;margin-top:6px;letter-spacing:-.02em}
+  .score-card .sub{color:var(--muted);font-size:12px;margin-top:4px}
+  .val.pos{color:var(--good)} .val.neg{color:var(--bad)} .val.mid{color:var(--warn)}
+  .scorenum{font-weight:750}
+  .bar{height:7px;border-radius:6px;background:#eef1f7;overflow:hidden;margin-top:10px}
+  .bar > i{display:block;height:100%;border-radius:6px;background:var(--good)}
+
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;
+    padding:11px 18px;border-radius:10px;box-shadow:var(--shadow);font-size:13px;font-weight:600;z-index:50;opacity:0;
+    transition:opacity .2s, transform .2s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  .toast.err{background:var(--bad)}
+
+  .hamburger{display:none}
+  @media(max-width:820px){
+    #app{grid-template-columns:1fr}
+    aside{position:fixed;z-index:40;top:0;bottom:0;left:0;width:230px;transform:translateX(-100%);transition:transform .2s}
+    aside.open{transform:none}
+    .hamburger{display:grid;place-items:center;width:40px;height:40px;border-radius:9px;background:#fff;border:1px solid var(--line)}
+    main{padding:18px 16px}
+    .grid2,.grid3{grid-template-columns:1fr}
+    .table-wrap{overflow-x:auto}
+    table{min-width:640px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login">
+  <div class="login-card">
+    <div class="brand">
+      <div class="logo">T</div>
+      <div><h2>Task System</h2><small>Login with your name & PIN</small></div>
+    </div>
+    <div class="field">
+      <label>Name</label>
+      <select id="loginName"><option value="">Loading…</option></select>
+    </div>
+    <div class="field">
+      <label>PIN</label>
+      <input id="loginPin" type="password" inputmode="numeric" placeholder="Enter PIN" autocomplete="off" />
+    </div>
+    <button class="btn-primary" id="loginBtn">Sign in</button>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" class="hidden">
+  <aside id="sidebar">
+    <div class="brand"><div class="logo">T</div><div><h2>Task System</h2><small id="roleLabel"></small></div></div>
+    <nav id="nav"></nav>
+    <div class="sidefoot">
+      <div class="who" id="whoName">—<small id="whoRole"></small></div>
+      <button class="logout" id="logoutBtn">Sign out</button>
+    </div>
+  </aside>
+
+  <main>
+    <button class="hamburger" id="hamburger" aria-label="Menu" style="margin-bottom:14px">☰</button>
+
+    <!-- ---- Today / My tasks ---- -->
+    <section class="view active" id="view-today">
+      <div class="page-head">
+        <div><h1 id="todayTitle">Today's tasks</h1><p>Mark tasks done for the selected date.</p></div>
+      </div>
+      <div class="card card-pad">
+        <div class="toolbar">
+          <div><label>Date</label><input type="date" id="todayDate" style="width:180px"></div>
+          <div id="todayEmpWrap" class="hidden"><label>Employee</label>
+            <select id="todayEmp" style="width:200px"></select></div>
+        </div>
+        <div class="table-wrap">
+          <table id="todayTable"><thead></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---- Assign ---- -->
+    <section class="view" id="view-assign">
+      <div class="page-head"><div><h1>Assign task</h1><p>Set a recurring task. Only one row is stored — dates are generated automatically.</p></div></div>
+      <div class="card card-pad" style="max-width:720px">
+        <div class="grid2">
+          <div class="field"><label>Employee</label><select id="tDoer"></select></div>
+          <div class="field"><label>Task title</label><input id="tTitle" placeholder="e.g. Post daily IPO update"></div>
+        </div>
+        <div class="grid3">
+          <div class="field"><label>Frequency</label>
+            <select id="tFreq">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </select></div>
+          <div class="field"><label>Start date</label><input type="date" id="tStart"></div>
+          <div class="field"><label>End date</label><input type="date" id="tEnd"></div>
+        </div>
+        <div class="field" id="daysWrap">
+          <label>Days of week <span style="font-weight:400;color:var(--muted)">(for daily / weekly — leave all off = every day)</span></label>
+          <div class="days" id="tDays"></div>
+        </div>
+        <div class="field"><label>Link (optional)</label><input id="tLink" placeholder="https://…"></div>
+        <button class="btn-primary" id="assignBtn" style="width:auto;padding:12px 22px">Assign task</button>
+        <div class="msg" id="assignMsg"></div>
+      </div>
+    </section>
+
+    <!-- ---- Master ---- -->
+    <section class="view" id="view-master">
+      <div class="page-head"><div><h1>Master list</h1><p>Every assigned task. Delete removes it everywhere.</p></div></div>
+      <div class="card card-pad">
+        <div class="toolbar">
+          <div class="grow"><input id="masterSearch" placeholder="Search title or employee…"></div>
+          <select id="masterEmp" style="width:200px"></select>
+        </div>
+        <div class="table-wrap"><table id="masterTable"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ---- Dashboard ---- -->
+    <section class="view" id="view-dash">
+      <div class="page-head"><div><h1>Dashboard & scores</h1><p id="dashSub"></p></div></div>
+      <div id="dashBody"></div>
+    </section>
+
+    <!-- ---- Users ---- -->
+    <section class="view" id="view-users">
+      <div class="page-head"><div><h1>People</h1><p>Add names here — they show up across the system instantly.</p></div></div>
+      <div class="grid2" style="align-items:start">
+        <div class="card card-pad">
+          <h3 style="margin-bottom:14px">Add person</h3>
+          <div class="field"><label>Name</label><input id="uName" placeholder="Full name"></div>
+          <div class="grid2">
+            <div class="field"><label>Phone</label><input id="uPhone" inputmode="numeric" placeholder="Mobile number"></div>
+            <div class="field"><label>PIN</label><input id="uPin" inputmode="numeric" placeholder="Login PIN"></div>
+          </div>
+          <div class="field"><label>Role</label>
+            <select id="uRole"><option value="doer">Doer</option><option value="subadmin">Sub-admin</option><option value="admin">Admin</option></select></div>
+          <button class="btn-primary" id="addUserBtn" style="width:auto;padding:11px 20px">Add person</button>
+          <div class="msg" id="userMsg"></div>
+        </div>
+        <div class="card card-pad">
+          <h3 style="margin-bottom:14px">Team</h3>
+          <div class="table-wrap"><table id="usersTable"><thead></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= CONFIG ================= */
+/* Apps Script Web App URL yaha paste karo (setup guide me steps hain): */
+const API_URL = "https://script.google.com/macros/s/AKfycbyL5vD-wmITNLTphSZsGVTG9vWib_M5reVUuvyVJIFiYrURttZCOlgvbrf-ECufpf5z/exec";
+
+/* ================= state ================= */
+const S = { name:null, role:null, phone:null, pin:null, tasks:[], completions:[], users:[] };
+const WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const $ = s => document.querySelector(s);
+
+/* ================= api ================= */
+async function api(payload){
+  const res = await fetch(API_URL, { method:"POST", body: JSON.stringify(payload) });
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || "Something went wrong");
+  return data;
+}
+function withAuth(p){ return Object.assign({ actorName:S.name, actorPin:S.pin }, p); }
+
+/* ================= date utils ================= */
+function toISO(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function fromISO(s){ const [y,m,d]=String(s).split("-").map(Number); return new Date(y,(m||1)-1,d||1); }
+function todayISO(){ return toISO(new Date()); }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function maxISO(a,b){ return a>b?a:b; }
+function minISO(a,b){ return a<b?a:b; }
+function prettyDate(iso){ if(!iso) return "—"; const d=fromISO(iso); return d.toLocaleDateString(undefined,{day:"2-digit",month:"short",year:"numeric"}); }
+
+/* Monday-based week + calendar month bounds for a given date */
+function weekBounds(d){ const day=(d.getDay()+6)%7; const mon=addDays(d,-day); return [toISO(mon), toISO(addDays(mon,6))]; }
+function monthBounds(d){ const s=new Date(d.getFullYear(),d.getMonth(),1); const e=new Date(d.getFullYear(),d.getMonth()+1,0); return [toISO(s), toISO(e)]; }
+
+/* ================= recurrence: task -> occurrence dates within [fromISO,toISO] ================= */
+function occurrences(task, fromI, toI){
+  const start = maxISO(task.StartDate, fromI);
+  const endCap = task.EndDate ? task.EndDate : toI;
+  const end = minISO(endCap, toI);
+  if(!start || !end || start > end) return [];
+  const out = [];
+  const freq = (task.Frequency||"").toLowerCase();
+
+  if(freq==="daily" || freq==="weekly"){
+    const wanted = parseDays(task.Days);
+    let d = fromISO(start), e = fromISO(end);
+    for(; d<=e; d=addDays(d,1)){
+      if(wanted.length===0 || wanted.includes(d.getDay())) out.push(toISO(d));
+    }
+    return out;
+  }
+  // monthly / quarterly / yearly -> step from StartDate
+  const stepMonths = freq==="monthly"?1 : freq==="quarterly"?3 : freq==="yearly"?12 : 0;
+  if(stepMonths===0) return out;
+  const s0 = fromISO(task.StartDate);
+  const hardEnd = fromISO(endCap);
+  let cur = new Date(s0);
+  let guard = 0;
+  while(cur <= hardEnd && guard++ < 4000){
+    const iso = toISO(cur);
+    if(iso>=start && iso<=end) out.push(iso);
+    cur = new Date(cur.getFullYear(), cur.getMonth()+stepMonths, s0.getDate());
+  }
+  return out;
+}
+function parseDays(s){
+  if(!s) return [];
+  return String(s).split(",").map(x=>x.trim()).filter(Boolean)
+    .map(n=>WD.indexOf(n)).filter(i=>i>=0);
+}
+
+/* ================= scoring =================
+   score = -100 + (done / planned)*100    (range -100 .. 0)
+   planned = occurrences with date <= today, within the period
+*/
+function compKey(taskId, date){ return taskId+"|"+date; }
+function buildCompIndex(){ const m={}; S.completions.forEach(c=>{ m[compKey(c.TaskID,c.Date)]=c; }); return m; }
+
+function scoreFor(doerName, periodFrom, periodTo){
+  const cap = minISO(periodTo, todayISO());
+  const idx = buildCompIndex();
+  let planned=0, done=0, onTime=0;
+  const my = S.tasks.filter(t => t.Doer.trim().toLowerCase()===doerName.trim().toLowerCase());
+  my.forEach(t=>{
+    occurrences(t, periodFrom, cap).forEach(date=>{
+      planned++;
+      const c = idx[compKey(t.TaskID,date)];
+      if(c){ done++; if(c.OnTime) onTime++; }
+    });
+  });
+  const s1 = planned ? (-100 + (done/planned)*100) : 0;
+  const s2 = planned ? (-100 + (onTime/planned)*100) : 0;
+  return { planned, done, onTime, s1, s2 };
+}
+
+/* ================= role helpers ================= */
+const isAdmin = () => S.role==="admin";
+const isStaff = () => ["admin","subadmin","sub-admin","sub admin"].includes(S.role);
+const isDoer  = () => !isStaff();
+
+/* ================= toast / msg ================= */
+let toastT;
+function toast(msg, err){ const t=$("#toast"); t.textContent=msg; t.className="toast show"+(err?" err":""); clearTimeout(toastT); toastT=setTimeout(()=>t.className="toast",2200); }
+function showMsg(el, txt, ok){ el.textContent=txt; el.className="msg "+(ok?"ok":"err"); }
+
+/* ================= LOGIN ================= */
+async function loadNames(){
+  try{
+    const d = await api({ action:"getNames" });
+    const sel=$("#loginName");
+    sel.innerHTML = '<option value="">Select your name…</option>' +
+      d.names.map(n=>`<option>${esc(n)}</option>`).join("");
+  }catch(e){ $("#loginName").innerHTML='<option value="">Could not load names</option>'; showMsg($("#loginMsg"), e.message); }
+}
+async function doLogin(){
+  const name=$("#loginName").value, pin=$("#loginPin").value.trim();
+  if(!name){ showMsg($("#loginMsg"),"Apna naam select karo"); return; }
+  if(!pin){ showMsg($("#loginMsg"),"PIN daalo"); return; }
+  const btn=$("#loginBtn"); btn.disabled=true; btn.textContent="Signing in…";
+  try{
+    const d = await api({ action:"login", name, pin });
+    S.name=d.user.name; S.role=d.user.role; S.phone=d.user.phone; S.pin=pin;
+    startApp();
+  }catch(e){ showMsg($("#loginMsg"), e.message); }
+  finally{ btn.disabled=false; btn.textContent="Sign in"; }
+}
+
+/* ================= APP BOOT ================= */
+const NAV = [
+  { id:"today",  label:"Today's tasks", ic:"✓", roles:["*"] },
+  { id:"assign", label:"Assign task",   ic:"＋", roles:["staff"] },
+  { id:"master", label:"Master list",   ic:"▤", roles:["staff"] },
+  { id:"dash",   label:"Dashboard",     ic:"◔", roles:["*"] },
+  { id:"users",  label:"People",        ic:"◑", roles:["staff"] },
+];
+function startApp(){
+  $("#login").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  $("#whoName").firstChild.textContent = S.name;
+  $("#whoRole").textContent = roleName(S.role);
+  $("#roleLabel").textContent = roleName(S.role)+" panel";
+
+  const nav=$("#nav"); nav.innerHTML="";
+  NAV.filter(n => n.roles.includes("*") || (n.roles.includes("staff") && isStaff()))
+     .forEach(n=>{
+    const b=document.createElement("button");
+    b.className="nav-btn"; b.dataset.view=n.id;
+    b.innerHTML=`<span class="ic">${n.ic}</span> ${n.label}`;
+    b.onclick=()=>go(n.id);
+    nav.appendChild(b);
+  });
+  $("#todayDate").value = todayISO();
+  buildDayChips();
+  go(isDoer() ? "today" : "today");
+  refresh();
+}
+function roleName(r){ return r==="admin"?"Admin": (isStaffRole(r)?"Sub-admin":"Doer"); }
+function isStaffRole(r){ return ["admin","subadmin","sub-admin","sub admin"].includes(r); }
+
+function go(view){
+  document.querySelectorAll(".view").forEach(v=>v.classList.remove("active"));
+  $("#view-"+view).classList.add("active");
+  document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active", b.dataset.view===view));
+  $("#sidebar").classList.remove("open");
+  if(view==="dash") renderDashboard();
+  if(view==="today") renderToday();
+  if(view==="master") renderMaster();
+  if(view==="users") renderUsers();
+}
+
+/* ================= data refresh ================= */
+async function refresh(){
+  try{
+    const d = await api(withAuth({ action:"getState" }));
+    S.tasks=d.tasks||[]; S.completions=d.completions||[]; S.users=d.users||[];
+    fillEmployeeSelects();
+    renderToday(); renderMaster(); renderDashboard(); renderUsers();
+  }catch(e){ toast(e.message, true); }
+}
+
+function doerList(){ return S.users.map(u=>u.name); }
+function fillEmployeeSelects(){
+  const opts = doerList().map(n=>`<option>${esc(n)}</option>`).join("");
+  const tDoer=$("#tDoer"); if(tDoer) tDoer.innerHTML = '<option value="">Select employee…</option>'+opts;
+  const me=$("#masterEmp"); if(me) me.innerHTML='<option value="">All employees</option>'+opts;
+  const te=$("#todayEmp"); if(te) te.innerHTML='<option value="">All employees</option>'+opts;
+}
+
+/* ================= TODAY / MY TASKS ================= */
+function buildDayChips(){
+  const wrap=$("#tDays"); wrap.innerHTML="";
+  ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].forEach(d=>{
+    const l=document.createElement("label"); l.className="day-chip";
+    l.innerHTML=`<input type="checkbox" value="${d}"><span>${d}</span>`;
+    wrap.appendChild(l);
+  });
+}
+function renderToday(){
+  if(!S.name) return;
+  const staff=isStaff();
+  $("#todayEmpWrap").classList.toggle("hidden", !staff);
+  const date = $("#todayDate").value || todayISO();
+  const empFilter = staff ? $("#todayEmp").value : S.name;
+  const idx = buildCompIndex();
+
+  // collect occurrences on this date
+  const rows=[];
+  S.tasks.forEach(t=>{
+    if(empFilter && t.Doer.trim().toLowerCase()!==empFilter.trim().toLowerCase()) return;
+    const occ = occurrences(t, date, date);
+    if(occ.length){ rows.push({ t, date, done: !!idx[compKey(t.TaskID,date)] }); }
+  });
+
+  const thead=$("#todayTable thead"), tbody=$("#todayTable tbody");
+  thead.innerHTML = `<tr>${staff?"<th>Employee</th>":""}<th>Task</th><th>Link</th><th>Status</th><th></th></tr>`;
+  if(!rows.length){ tbody.innerHTML=`<tr><td colspan="6" class="empty">Is date par koi task nahi.</td></tr>`; return; }
+  tbody.innerHTML = rows.map(r=>{
+    const link = r.t.Link ? `<a href="${esc(r.t.Link)}" target="_blank" rel="noopener">Open ↗</a>` : "—";
+    const status = r.done ? `<span class="pill-done">Done</span>` : `<span class="pill-pending">Pending</span>`;
+    const btn = r.done
+      ? `<button class="btn-undo" onclick="undo('${r.t.TaskID}','${r.date}')">Undo</button>`
+      : `<button class="btn-done" onclick="done('${r.t.TaskID}','${r.date}')">Mark done</button>`;
+    return `<tr>${staff?`<td>${esc(r.t.Doer)}</td>`:""}<td><strong>${esc(r.t.Title)}</strong></td><td>${link}</td><td>${status}</td><td style="text-align:right">${btn}</td></tr>`;
+  }).join("");
+}
+async function done(taskId, date){
+  try{ await api(withAuth({action:"markDone", taskId, date}));
+    S.completions.push({CompletionID:"tmp", TaskID:taskId, Doer:"", Date:date, OnTime: todayISO()<=date});
+    toast("Marked done"); renderToday(); renderDashboard();
+  }catch(e){ toast(e.message,true); }
+}
+async function undo(taskId, date){
+  try{ await api(withAuth({action:"markUndone", taskId, date}));
+    S.completions = S.completions.filter(c=>!(c.TaskID===taskId && c.Date===date));
+    toast("Undone"); renderToday(); renderDashboard();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ================= ASSIGN ================= */
+function toggleDays(){
+  const f=$("#tFreq").value;
+  $("#daysWrap").style.display = (f==="daily"||f==="weekly") ? "block":"none";
+}
+async function assign(){
+  const doer=$("#tDoer").value, title=$("#tTitle").value.trim(), freq=$("#tFreq").value;
+  const start=$("#tStart").value, end=$("#tEnd").value, link=$("#tLink").value.trim();
+  const days=[...document.querySelectorAll("#tDays input:checked")].map(c=>c.value).join(",");
+  const msg=$("#assignMsg");
+  if(!doer) return showMsg(msg,"Employee select karo");
+  if(!title) return showMsg(msg,"Task title likho");
+  if(!start||!end) return showMsg(msg,"Start aur end date daalo");
+  if(end<start) return showMsg(msg,"End date start ke baad honi chahiye");
+  const btn=$("#assignBtn"); btn.disabled=true; btn.textContent="Assigning…";
+  try{
+    const d=await api(withAuth({action:"addTask", task:{doer,title,frequency:freq,startDate:start,endDate:end,days,link}}));
+    S.tasks.push(d.task);
+    showMsg(msg, "Task assigned ✓", true);
+    $("#tTitle").value=""; $("#tLink").value="";
+    document.querySelectorAll("#tDays input:checked").forEach(c=>c.checked=false);
+    renderMaster(); renderToday(); renderDashboard();
+  }catch(e){ showMsg(msg, e.message); }
+  finally{ btn.disabled=false; btn.textContent="Assign task"; }
+}
+
+/* ================= MASTER ================= */
+function renderMaster(){
+  if(!isStaff() || !S.tasks) return;
+  const q=($("#masterSearch")?.value||"").toLowerCase();
+  const emp=$("#masterEmp")?.value||"";
+  const admin=isAdmin();
+  let rows = S.tasks.slice().sort((a,b)=> (b.CreatedAt||"").localeCompare(a.CreatedAt||""));
+  if(emp) rows=rows.filter(t=>t.Doer.trim().toLowerCase()===emp.trim().toLowerCase());
+  if(q) rows=rows.filter(t=>(t.Title+" "+t.Doer).toLowerCase().includes(q));
+
+  const thead=$("#masterTable thead"), tbody=$("#masterTable tbody");
+  thead.innerHTML=`<tr><th>Employee</th><th>Task</th><th>Frequency</th><th>Days</th><th>Start</th><th>End</th><th>Link</th>${admin?"<th></th>":""}</tr>`;
+  if(!rows.length){ tbody.innerHTML=`<tr><td colspan="8" class="empty">Koi task nahi mila.</td></tr>`; return; }
+  tbody.innerHTML = rows.map(t=>{
+    const days = parseDays(t.Days).map(i=>WD[i]).join(", ") || "Every day";
+    const link = t.Link ? `<a href="${esc(t.Link)}" target="_blank" rel="noopener">Open ↗</a>` : "—";
+    const del = admin ? `<td style="text-align:right"><button class="btn-del" onclick="del('${t.TaskID}')">Delete</button></td>` : "";
+    return `<tr><td>${esc(t.Doer)}</td><td><strong>${esc(t.Title)}</strong></td>
+      <td><span class="tag freq">${esc(t.Frequency)}</span></td>
+      <td>${(t.Frequency==="daily"||t.Frequency==="weekly")?esc(days):"—"}</td>
+      <td>${prettyDate(t.StartDate)}</td><td>${prettyDate(t.EndDate)}</td><td>${link}</td>${del}</tr>`;
+  }).join("");
+}
+async function del(taskId){
+  if(!confirm("Ye task delete karein? Iske saare records hat jaayenge.")) return;
+  try{ await api(withAuth({action:"deleteTask", taskId}));
+    S.tasks=S.tasks.filter(t=>t.TaskID!==taskId);
+    S.completions=S.completions.filter(c=>c.TaskID!==taskId);
+    toast("Deleted"); renderMaster(); renderToday(); renderDashboard();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ================= DASHBOARD ================= */
+function scoreClass(v){ return v>=-10?"pos":(v>=-40?"mid":"neg"); }
+function fmtPct(v){ return (v>0?"+":"")+v.toFixed(0)+"%"; }
+function renderDashboard(){
+  if(!S.name) return;
+  const now=new Date(); const [wf,wt]=weekBounds(now); const [mf,mt]=monthBounds(now);
+  $("#dashSub").textContent = `Week ${prettyDate(wf)} – ${prettyDate(wt)}  •  ${now.toLocaleDateString(undefined,{month:"long",year:"numeric"})}`;
+  const body=$("#dashBody");
+
+  if(isDoer()){
+    const w=scoreFor(S.name, wf, wt), m=scoreFor(S.name, mf, mt);
+    body.innerHTML = `
+      <div class="grid2" style="margin-bottom:14px">
+        ${scoreCard("This week — Completion", w.s1, `${w.done}/${w.planned} tasks done`)}
+        ${scoreCard("This week — On-time", w.s2, `${w.onTime}/${w.planned} on time`)}
+      </div>
+      <div class="grid2">
+        ${scoreCard("This month — Completion", m.s1, `${m.done}/${m.planned} tasks done`)}
+        ${scoreCard("This month — On-time", m.s2, `${m.onTime}/${m.planned} on time`)}
+      </div>`;
+    return;
+  }
+
+  // staff: table of everyone
+  const doers = S.users.filter(u=>!isStaffRole(u.role)).map(u=>u.name);
+  const targets = doers.length? doers : doerList();
+  const rows = targets.map(name=>{
+    const w=scoreFor(name, wf, wt), m=scoreFor(name, mf, mt);
+    return {name,w,m};
+  }).sort((a,b)=> b.w.s1 - a.w.s1);
+
+  body.innerHTML = `<div class="card card-pad"><div class="table-wrap"><table>
+    <thead><tr><th>Employee</th>
+      <th>Week completion</th><th>Week on-time</th>
+      <th>Month completion</th><th>Month on-time</th></tr></thead>
+    <tbody>${
+      rows.length? rows.map(r=>`
+        <tr><td><strong>${esc(r.name)}</strong></td>
+          <td>${scoreCell(r.w.s1, r.w.done, r.w.planned)}</td>
+          <td>${scoreCell(r.w.s2, r.w.onTime, r.w.planned)}</td>
+          <td>${scoreCell(r.m.s1, r.m.done, r.m.planned)}</td>
+          <td>${scoreCell(r.m.s2, r.m.onTime, r.m.planned)}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="empty">Abhi koi doer nahi.</td></tr>`
+    }</tbody></table></div></div>`;
+}
+function scoreCard(lbl, val, sub){
+  const cls=scoreClass(val); const fill=Math.max(0, Math.min(100, val+100));
+  return `<div class="card score-card"><div class="lbl">${lbl}</div>
+    <div class="val ${cls}">${fmtPct(val)}</div><div class="sub">${sub}</div>
+    <div class="bar"><i style="width:${fill}%;background:var(--${cls==='pos'?'good':cls==='mid'?'warn':'bad'})"></i></div></div>`;
+}
+function scoreCell(val, num, den){
+  if(!den) return `<span style="color:var(--muted)">—</span>`;
+  const cls=scoreClass(val);
+  const color = cls==='pos'?'var(--good)':cls==='mid'?'var(--warn)':'var(--bad)';
+  return `<span class="scorenum" style="color:${color}">${fmtPct(val)}</span> <span style="color:var(--muted);font-size:12px">(${num}/${den})</span>`;
+}
+
+/* ================= USERS ================= */
+function renderUsers(){
+  if(!isStaff() || !S.users) return;
+  const admin=isAdmin();
+  const thead=$("#usersTable thead"), tbody=$("#usersTable tbody");
+  thead.innerHTML=`<tr><th>Name</th><th>Phone</th><th>Role</th>${admin?"<th></th>":""}</tr>`;
+  tbody.innerHTML = S.users.map(u=>{
+    const rc = isStaffRole(u.role)? (u.role==="admin"?"role-admin":"role-subadmin") : "role-doer";
+    const del = admin && u.name!==S.name ? `<td style="text-align:right"><button class="btn-del" onclick="delUser('${esc(u.name)}')">Remove</button></td>` : (admin?"<td></td>":"");
+    return `<tr><td><strong>${esc(u.name)}</strong></td><td>${esc(u.phone||"—")}</td>
+      <td><span class="tag ${rc}">${roleName(u.role)}</span></td>${del}</tr>`;
+  }).join("") || `<tr><td colspan="4" class="empty">Koi user nahi.</td></tr>`;
+}
+async function addUser(){
+  const name=$("#uName").value.trim(), phone=$("#uPhone").value.trim(), pin=$("#uPin").value.trim(), role=$("#uRole").value;
+  const msg=$("#userMsg");
+  if(!name) return showMsg(msg,"Naam daalo");
+  if(!pin) return showMsg(msg,"PIN daalo");
+  try{
+    const d=await api(withAuth({action:"addUser", name, phone, pin, role}));
+    S.users.push(d.user); showMsg(msg,"Added ✓",true);
+    $("#uName").value=""; $("#uPhone").value=""; $("#uPin").value="";
+    fillEmployeeSelects(); renderUsers();
+  }catch(e){ showMsg(msg, e.message); }
+}
+async function delUser(name){
+  if(!confirm(name+" ko remove karein?")) return;
+  try{ await api(withAuth({action:"deleteUser", name}));
+    S.users=S.users.filter(u=>u.name!==name); toast("Removed"); fillEmployeeSelects(); renderUsers();
+  }catch(e){ toast(e.message,true); }
+}
+
+/* ================= util ================= */
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ================= wire up ================= */
+$("#loginBtn").onclick=doLogin;
+$("#loginPin").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+$("#logoutBtn").onclick=()=>location.reload();
+$("#assignBtn").onclick=assign;
+$("#tFreq").onchange=toggleDays;
+$("#addUserBtn").onclick=addUser;
+$("#todayDate").onchange=renderToday;
+$("#todayEmp").onchange=renderToday;
+$("#masterSearch").oninput=renderMaster;
+$("#masterEmp").onchange=renderMaster;
+$("#hamburger").onclick=()=>$("#sidebar").classList.toggle("open");
+
+/* boot */
+if(API_URL.startsWith("PASTE")){
+  $("#loginName").innerHTML='<option>Set API_URL first</option>';
+  showMsg($("#loginMsg"),"index.html me API_URL abhi set nahi hai. Setup guide follow karo.");
+}else{
+  toggleDays(); loadNames();
+}
+</script>
+</body>
+</html>
