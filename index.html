@@ -223,7 +223,6 @@
       <div class="card card-pad">
         <div class="toolbar">
           <div class="grow"><label>Search</label><input id="masterSearch" placeholder="Task ya employee…"></div>
-          <div><label>Employee</label><select id="masterEmp" style="width:170px"></select></div>
           <div><label>Frequency</label>
             <select id="masterFreq" style="width:150px">
               <option value="">All frequencies</option>
@@ -235,7 +234,14 @@
             </select></div>
           <div><label>Active from</label><input type="date" id="masterStart" style="width:160px"></div>
           <div><label>Active to</label><input type="date" id="masterEnd" style="width:160px"></div>
-          <div style="align-self:flex-end"><button type="button" class="btn-ghost" id="masterClear" style="padding:10px 14px">Clear</button></div>
+          <div style="align-self:flex-end;display:flex;gap:8px">
+            <button type="button" class="btn-ghost" id="masterClear" style="padding:10px 14px">Clear</button>
+            <button type="button" class="btn-del" id="masterDeleteAll" style="padding:10px 14px;display:none">Delete all</button>
+          </div>
+        </div>
+        <div style="margin-bottom:14px">
+          <label>Employees <span style="font-weight:400;color:var(--muted)">(ek ya jyada tap karo — kuch na chuno = sab)</span></label>
+          <div class="days" id="masterEmpChips"></div>
         </div>
         <div class="table-wrap"><table id="masterTable"><thead></thead><tbody></tbody></table></div>
       </div>
@@ -288,7 +294,7 @@
 <script>
 /* ================= CONFIG ================= */
 /* Apps Script Web App URL yaha paste karo (setup guide me steps hain): */
-const API_URL = "https://script.google.com/macros/s/AKfycbyHVtGTpdfxlgrkrlAjEgOQWY0-ZvazZzM9rzlDHexQKb-EV0m-JpgxrYEB-Pi9jTNR/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbzeJc5lbb-RhWwu88gYclP3a_F3acpBIpybfTshHEwTNTdA2XHpTuTNSc-kNM9tHtks/exec";
 
 /* ================= state ================= */
 const S = { name:null, role:null, phone:null, pin:null, tasks:[], completions:[], users:[] };
@@ -470,8 +476,12 @@ function doerList(){ return S.users.map(u=>u.name); }
 function fillEmployeeSelects(){
   const opts = doerList().map(n=>`<option>${esc(n)}</option>`).join("");
   const tDoer=$("#tDoer"); if(tDoer) tDoer.innerHTML = '<option value="">Select employee…</option>'+opts;
-  const me=$("#masterEmp"); if(me) me.innerHTML='<option value="">All employees</option>'+opts;
   const te=$("#todayEmp"); if(te) te.innerHTML='<option value="">All employees</option>'+opts;
+  const chips=$("#masterEmpChips");
+  if(chips){
+    chips.innerHTML = doerList().map(n=>`<label class="day-chip"><input type="checkbox" value="${esc(n)}"><span>${esc(n)}</span></label>`).join("");
+    chips.querySelectorAll("input").forEach(c=> c.onchange=renderMaster);
+  }
 }
 
 /* ================= TODAY / MY TASKS ================= */
@@ -569,18 +579,26 @@ async function assign(){
 function renderMaster(){
   if(!isStaff() || !S.tasks) return;
   const q=($("#masterSearch")?.value||"").toLowerCase();
-  const emp=$("#masterEmp")?.value||"";
+  const emps=[...document.querySelectorAll("#masterEmpChips input:checked")].map(c=>c.value.trim().toLowerCase());
   const freq=$("#masterFreq")?.value||"";
   const fStart=$("#masterStart")?.value||"";
   const fEnd=$("#masterEnd")?.value||"";
   const admin=isAdmin();
   let rows = S.tasks.slice().sort((a,b)=> (b.CreatedAt||"").localeCompare(a.CreatedAt||""));
-  if(emp) rows=rows.filter(t=>t.Doer.trim().toLowerCase()===emp.trim().toLowerCase());
+  if(emps.length) rows=rows.filter(t=> emps.includes(t.Doer.trim().toLowerCase()));
   if(freq) rows=rows.filter(t=>t.Frequency===freq);
   if(q) rows=rows.filter(t=>(t.Title+" "+t.Doer).toLowerCase().includes(q));
-  // active-period overlap: task jo selected range me chal raha ho
+  // active-period overlap: task jo selected range me chal raha ho (past bhi shaamil)
   if(fStart) rows=rows.filter(t=> !t.EndDate || t.EndDate >= fStart);
   if(fEnd)   rows=rows.filter(t=> t.StartDate <= fEnd);
+
+  // Delete all button (sirf admin, aur jab rows ho)
+  const delAll=$("#masterDeleteAll");
+  if(delAll){
+    delAll.style.display = (admin && rows.length) ? "inline-block" : "none";
+    delAll.textContent = `Delete all (${rows.length})`;
+    delAll._ids = rows.map(t=>t.TaskID);
+  }
 
   const thead=$("#masterTable thead"), tbody=$("#masterTable tbody");
   thead.innerHTML=`<tr><th>Employee</th><th>Task</th><th>Frequency</th><th>Days</th><th>Start</th><th>End</th><th>Link</th>${admin?"<th></th>":""}</tr>`;
@@ -602,6 +620,20 @@ async function del(taskId){
     S.completions=S.completions.filter(c=>c.TaskID!==taskId);
     toast("Deleted"); renderMaster(); renderToday(); renderDashboard();
   }catch(e){ toast(e.message,true); }
+}
+async function deleteAllShown(){
+  const ids = ($("#masterDeleteAll")._ids || []).slice();
+  if(!ids.length) return;
+  if(!confirm(ids.length+" task delete karein? Ye wapas nahi aayenge.")) return;
+  const btn=$("#masterDeleteAll"); btn.disabled=true; const old=btn.textContent; btn.textContent="Deleting…";
+  try{
+    await api(withAuth({action:"deleteTasks", taskIds: ids}));
+    const set=new Set(ids);
+    S.tasks=S.tasks.filter(t=>!set.has(t.TaskID));
+    S.completions=S.completions.filter(c=>!set.has(c.TaskID));
+    toast(ids.length+" tasks deleted"); renderMaster(); renderToday(); renderDashboard();
+  }catch(e){ toast(e.message,true); btn.textContent=old; }
+  finally{ btn.disabled=false; }
 }
 
 /* ================= DASHBOARD ================= */
@@ -708,13 +740,14 @@ $("#dashToday").onclick=()=>{ const t=todayISO(); $("#dashStart").value=t; $("#d
 $("#dashWeek").onclick=()=>{ const [f,t]=weekBounds(new Date()); $("#dashStart").value=f; $("#dashEnd").value=t; renderDashboard(); };
 $("#dashMonth").onclick=()=>{ const [f,t]=monthBounds(new Date()); $("#dashStart").value=f; $("#dashEnd").value=t; renderDashboard(); };
 $("#masterSearch").oninput=renderMaster;
-$("#masterEmp").onchange=renderMaster;
 $("#masterFreq").onchange=renderMaster;
 $("#masterStart").onchange=renderMaster;
 $("#masterEnd").onchange=renderMaster;
+$("#masterDeleteAll").onclick=deleteAllShown;
 $("#masterClear").onclick=()=>{
-  $("#masterSearch").value=""; $("#masterEmp").value="";
+  $("#masterSearch").value="";
   $("#masterFreq").value=""; $("#masterStart").value=""; $("#masterEnd").value="";
+  document.querySelectorAll("#masterEmpChips input:checked").forEach(c=>c.checked=false);
   renderMaster();
 };
 $("#hamburger").onclick=()=>$("#sidebar").classList.toggle("open");
