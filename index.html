@@ -222,8 +222,20 @@
       <div class="page-head"><div><h1>Master list</h1><p>Every assigned task. Delete removes it everywhere.</p></div></div>
       <div class="card card-pad">
         <div class="toolbar">
-          <div class="grow"><input id="masterSearch" placeholder="Search title or employee…"></div>
-          <select id="masterEmp" style="width:200px"></select>
+          <div class="grow"><label>Search</label><input id="masterSearch" placeholder="Task ya employee…"></div>
+          <div><label>Employee</label><select id="masterEmp" style="width:170px"></select></div>
+          <div><label>Frequency</label>
+            <select id="masterFreq" style="width:150px">
+              <option value="">All frequencies</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="yearly">Yearly</option>
+            </select></div>
+          <div><label>Active from</label><input type="date" id="masterStart" style="width:160px"></div>
+          <div><label>Active to</label><input type="date" id="masterEnd" style="width:160px"></div>
+          <div style="align-self:flex-end"><button type="button" class="btn-ghost" id="masterClear" style="padding:10px 14px">Clear</button></div>
         </div>
         <div class="table-wrap"><table id="masterTable"><thead></thead><tbody></tbody></table></div>
       </div>
@@ -558,10 +570,17 @@ function renderMaster(){
   if(!isStaff() || !S.tasks) return;
   const q=($("#masterSearch")?.value||"").toLowerCase();
   const emp=$("#masterEmp")?.value||"";
+  const freq=$("#masterFreq")?.value||"";
+  const fStart=$("#masterStart")?.value||"";
+  const fEnd=$("#masterEnd")?.value||"";
   const admin=isAdmin();
   let rows = S.tasks.slice().sort((a,b)=> (b.CreatedAt||"").localeCompare(a.CreatedAt||""));
   if(emp) rows=rows.filter(t=>t.Doer.trim().toLowerCase()===emp.trim().toLowerCase());
+  if(freq) rows=rows.filter(t=>t.Frequency===freq);
   if(q) rows=rows.filter(t=>(t.Title+" "+t.Doer).toLowerCase().includes(q));
+  // active-period overlap: task jo selected range me chal raha ho
+  if(fStart) rows=rows.filter(t=> !t.EndDate || t.EndDate >= fStart);
+  if(fEnd)   rows=rows.filter(t=> t.StartDate <= fEnd);
 
   const thead=$("#masterTable thead"), tbody=$("#masterTable tbody");
   thead.innerHTML=`<tr><th>Employee</th><th>Task</th><th>Frequency</th><th>Days</th><th>Start</th><th>End</th><th>Link</th>${admin?"<th></th>":""}</tr>`;
@@ -690,6 +709,14 @@ $("#dashWeek").onclick=()=>{ const [f,t]=weekBounds(new Date()); $("#dashStart")
 $("#dashMonth").onclick=()=>{ const [f,t]=monthBounds(new Date()); $("#dashStart").value=f; $("#dashEnd").value=t; renderDashboard(); };
 $("#masterSearch").oninput=renderMaster;
 $("#masterEmp").onchange=renderMaster;
+$("#masterFreq").onchange=renderMaster;
+$("#masterStart").onchange=renderMaster;
+$("#masterEnd").onchange=renderMaster;
+$("#masterClear").onclick=()=>{
+  $("#masterSearch").value=""; $("#masterEmp").value="";
+  $("#masterFreq").value=""; $("#masterStart").value=""; $("#masterEnd").value="";
+  renderMaster();
+};
 $("#hamburger").onclick=()=>$("#sidebar").classList.toggle("open");
 document.querySelectorAll(".preset").forEach(b=> b.onclick=()=>setDaysPreset(b.dataset.preset));
 
