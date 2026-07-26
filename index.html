@@ -170,7 +170,8 @@
       </div>
       <div class="card card-pad">
         <div class="toolbar">
-          <div><label>Date</label><input type="date" id="todayDate" style="width:180px"></div>
+          <div><label>Start date</label><input type="date" id="todayStart" style="width:170px"></div>
+          <div><label>End date</label><input type="date" id="todayEnd" style="width:170px"></div>
           <div id="todayEmpWrap" class="hidden"><label>Employee</label>
             <select id="todayEmp" style="width:200px"></select></div>
         </div>
@@ -231,6 +232,17 @@
     <!-- ---- Dashboard ---- -->
     <section class="view" id="view-dash">
       <div class="page-head"><div><h1>Dashboard & scores</h1><p id="dashSub"></p></div></div>
+      <div class="card card-pad" style="margin-bottom:14px">
+        <div class="toolbar" style="margin-bottom:0">
+          <div><label>Start date</label><input type="date" id="dashStart" style="width:170px"></div>
+          <div><label>End date</label><input type="date" id="dashEnd" style="width:170px"></div>
+          <div style="align-self:flex-end;display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn-ghost" id="dashToday" style="padding:9px 13px">Today</button>
+            <button type="button" class="btn-ghost" id="dashWeek" style="padding:9px 13px">This week</button>
+            <button type="button" class="btn-ghost" id="dashMonth" style="padding:9px 13px">This month</button>
+          </div>
+        </div>
+      </div>
       <div id="dashBody"></div>
     </section>
 
@@ -410,7 +422,10 @@ function startApp(){
     b.onclick=()=>go(n.id);
     nav.appendChild(b);
   });
-  $("#todayDate").value = todayISO();
+  const t = todayISO();
+  $("#todayStart").value = t; $("#todayEnd").value = t;
+  const [mf, mt] = monthBounds(new Date());
+  $("#dashStart").value = mf; $("#dashEnd").value = mt;
   buildDayChips();
   go(isDoer() ? "today" : "today");
   refresh();
@@ -470,21 +485,25 @@ function renderToday(){
   if(!S.name) return;
   const staff=isStaff();
   $("#todayEmpWrap").classList.toggle("hidden", !staff);
-  const date = $("#todayDate").value || todayISO();
+  const start = $("#todayStart").value || todayISO();
+  const end   = $("#todayEnd").value || start;
+  const lo = minISO(start,end), hi = maxISO(start,end);
   const empFilter = staff ? $("#todayEmp").value : S.name;
   const idx = buildCompIndex();
 
-  // collect occurrences on this date
+  // collect occurrences across the selected date range
   const rows=[];
   S.tasks.forEach(t=>{
     if(empFilter && t.Doer.trim().toLowerCase()!==empFilter.trim().toLowerCase()) return;
-    const occ = occurrences(t, date, date);
-    if(occ.length){ rows.push({ t, date, done: !!idx[compKey(t.TaskID,date)] }); }
+    occurrences(t, lo, hi).forEach(date=>{
+      rows.push({ t, date, done: !!idx[compKey(t.TaskID,date)] });
+    });
   });
+  rows.sort((a,b)=> a.date.localeCompare(b.date) || String(a.t.Title).localeCompare(String(b.t.Title)));
 
   const thead=$("#todayTable thead"), tbody=$("#todayTable tbody");
-  thead.innerHTML = `<tr>${staff?"<th>Employee</th>":""}<th>Task</th><th>Link</th><th>Status</th><th></th></tr>`;
-  if(!rows.length){ tbody.innerHTML=`<tr><td colspan="6" class="empty">Is date par koi task nahi.</td></tr>`; return; }
+  thead.innerHTML = `<tr><th>Date</th>${staff?"<th>Employee</th>":""}<th>Task</th><th>Link</th><th>Status</th><th></th></tr>`;
+  if(!rows.length){ tbody.innerHTML=`<tr><td colspan="7" class="empty">Is range me koi task nahi.</td></tr>`; return; }
   tbody.innerHTML = rows.map(r=>{
     const link = r.t.Link ? `<a href="${esc(r.t.Link)}" target="_blank" rel="noopener">Open ↗</a>` : "—";
     const status = r.done ? `<span class="pill-done">Done</span>` : `<span class="pill-pending">Pending</span>`;
@@ -492,7 +511,7 @@ function renderToday(){
     const btn = !mine ? "" : (r.done
       ? `<button class="btn-undo" onclick="undo('${r.t.TaskID}','${r.date}')">Undo</button>`
       : `<button class="btn-done" onclick="done('${r.t.TaskID}','${r.date}')">Mark done</button>`);
-    return `<tr>${staff?`<td>${esc(r.t.Doer)}</td>`:""}<td><strong>${esc(r.t.Title)}</strong></td><td>${link}</td><td>${status}</td><td style="text-align:right">${btn}</td></tr>`;
+    return `<tr><td>${prettyDate(r.date)}</td>${staff?`<td>${esc(r.t.Doer)}</td>`:""}<td><strong>${esc(r.t.Title)}</strong></td><td>${link}</td><td>${status}</td><td style="text-align:right">${btn}</td></tr>`;
   }).join("");
 }
 async function done(taskId, date){
@@ -571,57 +590,52 @@ function scoreClass(v){ return v>=-10?"pos":(v>=-40?"mid":"neg"); }
 function fmtPct(v){ return (v>0?"+":"")+v.toFixed(0)+"%"; }
 function renderDashboard(){
   if(!S.name) return;
-  const now=new Date(); const [wf,wt]=weekBounds(now); const [mf,mt]=monthBounds(now);
-  $("#dashSub").textContent = `Week ${prettyDate(wf)} – ${prettyDate(wt)}  •  ${now.toLocaleDateString(undefined,{month:"long",year:"numeric"})}`;
+  const start = $("#dashStart").value || todayISO();
+  const end   = $("#dashEnd").value || start;
+  const lo = minISO(start,end), hi = maxISO(start,end);
+  $("#dashSub").textContent = `${prettyDate(lo)} – ${prettyDate(hi)}`;
   const body=$("#dashBody");
 
   if(isDoer()){
-    const w=scoreFor(S.name, wf, wt), m=scoreFor(S.name, mf, mt);
-    body.innerHTML = `
-      <div class="grid2" style="margin-bottom:14px">
-        ${scoreCard("This week — Completion", w.s1, `${w.done}/${w.planned} tasks done`)}
-        ${scoreCard("This week — On-time", w.s2, `${w.onTime}/${w.planned} on time`)}
-      </div>
-      <div class="grid2">
-        ${scoreCard("This month — Completion", m.s1, `${m.done}/${m.planned} tasks done`)}
-        ${scoreCard("This month — On-time", m.s2, `${m.onTime}/${m.planned} on time`)}
+    const r = scoreFor(S.name, lo, hi);
+    body.innerHTML = `<div class="grid2">
+        ${detailCard("Completion", r.planned, r.done, r.s1, "Done")}
+        ${detailCard("On-time (same day)", r.planned, r.onTime, r.s2, "On time")}
       </div>`;
     return;
   }
 
-  // staff: table of everyone
-  // sab users (admin/sub-admin bhi task le sakte hain, isliye sabhi dikhenge)
+  // staff: table of everyone with full breakdown
   const targets = doerList();
-  const rows = targets.map(name=>{
-    const w=scoreFor(name, wf, wt), m=scoreFor(name, mf, mt);
-    return {name,w,m};
-  }).sort((a,b)=> b.w.s1 - a.w.s1);
-
+  const rows = targets.map(name=>({ name, r: scoreFor(name, lo, hi) }))
+                      .sort((a,b)=> b.r.s1 - a.r.s1);
   body.innerHTML = `<div class="card card-pad"><div class="table-wrap"><table>
-    <thead><tr><th>Employee</th>
-      <th>Week completion</th><th>Week on-time</th>
-      <th>Month completion</th><th>Month on-time</th></tr></thead>
+    <thead><tr>
+      <th>Employee</th><th>Planned</th><th>Done</th><th>Completion score</th>
+      <th>On-time</th><th>On-time score</th></tr></thead>
     <tbody>${
-      rows.length? rows.map(r=>`
-        <tr><td><strong>${esc(r.name)}</strong></td>
-          <td>${scoreCell(r.w.s1, r.w.done, r.w.planned)}</td>
-          <td>${scoreCell(r.w.s2, r.w.onTime, r.w.planned)}</td>
-          <td>${scoreCell(r.m.s1, r.m.done, r.m.planned)}</td>
-          <td>${scoreCell(r.m.s2, r.m.onTime, r.m.planned)}</td></tr>`).join("")
-      : `<tr><td colspan="5" class="empty">Abhi koi doer nahi.</td></tr>`
+      rows.length? rows.map(x=>{
+        const r=x.r;
+        return `<tr><td><strong>${esc(x.name)}</strong></td>
+          <td>${r.planned}</td><td>${r.done}</td><td>${scoreVal(r.s1, r.planned)}</td>
+          <td>${r.onTime}</td><td>${scoreVal(r.s2, r.planned)}</td></tr>`;
+      }).join("")
+      : `<tr><td colspan="6" class="empty">Is range me koi data nahi.</td></tr>`
     }</tbody></table></div></div>`;
 }
-function scoreCard(lbl, val, sub){
+function detailCard(title, planned, count, val, label){
   const cls=scoreClass(val); const fill=Math.max(0, Math.min(100, val+100));
-  return `<div class="card score-card"><div class="lbl">${lbl}</div>
-    <div class="val ${cls}">${fmtPct(val)}</div><div class="sub">${sub}</div>
-    <div class="bar"><i style="width:${fill}%;background:var(--${cls==='pos'?'good':cls==='mid'?'warn':'bad'})"></i></div></div>`;
+  const color = cls==='pos'?'var(--good)':cls==='mid'?'var(--warn)':'var(--bad)';
+  return `<div class="card score-card"><div class="lbl">${title}</div>
+    <div class="val ${cls}">${planned?fmtPct(val):"—"}</div>
+    <div class="sub">Planned <strong>${planned}</strong> &nbsp;•&nbsp; ${label} <strong>${count}</strong></div>
+    <div class="bar"><i style="width:${planned?fill:0}%;background:${color}"></i></div></div>`;
 }
-function scoreCell(val, num, den){
+function scoreVal(val, den){
   if(!den) return `<span style="color:var(--muted)">—</span>`;
   const cls=scoreClass(val);
   const color = cls==='pos'?'var(--good)':cls==='mid'?'var(--warn)':'var(--bad)';
-  return `<span class="scorenum" style="color:${color}">${fmtPct(val)}</span> <span style="color:var(--muted);font-size:12px">(${num}/${den})</span>`;
+  return `<span class="scorenum" style="color:${color}">${fmtPct(val)}</span>`;
 }
 
 /* ================= USERS ================= */
@@ -666,8 +680,14 @@ $("#logoutBtn").onclick=()=>location.reload();
 $("#assignBtn").onclick=assign;
 $("#tFreq").onchange=toggleDays;
 $("#addUserBtn").onclick=addUser;
-$("#todayDate").onchange=renderToday;
+$("#todayStart").onchange=renderToday;
+$("#todayEnd").onchange=renderToday;
 $("#todayEmp").onchange=renderToday;
+$("#dashStart").onchange=renderDashboard;
+$("#dashEnd").onchange=renderDashboard;
+$("#dashToday").onclick=()=>{ const t=todayISO(); $("#dashStart").value=t; $("#dashEnd").value=t; renderDashboard(); };
+$("#dashWeek").onclick=()=>{ const [f,t]=weekBounds(new Date()); $("#dashStart").value=f; $("#dashEnd").value=t; renderDashboard(); };
+$("#dashMonth").onclick=()=>{ const [f,t]=monthBounds(new Date()); $("#dashStart").value=f; $("#dashEnd").value=t; renderDashboard(); };
 $("#masterSearch").oninput=renderMaster;
 $("#masterEmp").onchange=renderMaster;
 $("#hamburger").onclick=()=>$("#sidebar").classList.toggle("open");
